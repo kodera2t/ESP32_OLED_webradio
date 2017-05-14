@@ -1,4 +1,6 @@
 Modified for OLED display support by kodera2t
+original code (w/o OLED) is
+https://github.com/MrBuddyCasino/ESP32_MP3_Decoder
 ----
 ESP32 MP3 decoder
 =======================
