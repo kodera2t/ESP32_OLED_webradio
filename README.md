@@ -19,6 +19,17 @@ GPIO26/DAC2   - BCLK
 GPIO22        - DATA
 ```
 and GPIO25/26 are fixed but GPIO22 can be re-arranged as you wish.
+(defined in components/audio_renderer.c)
+
+I2C OLED is connected, as
+ESP pin   - I2C signal
+```
+----------------------
+GPIO14   - SCL
+GPIO13   - SDA
+```
+,which defined in app_main.c Please change as you wish...
+
 
 More details can be found in the original author's explanation at
 https://github.com/MrBuddyCasino/ESP32_MP3_Decoder
