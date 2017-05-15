@@ -3,7 +3,7 @@ Modified for OLED display support by kodera2t
 original code (w/o OLED) is
 https://github.com/MrBuddyCasino/ESP32_MP3_Decoder
 
-OLED display mode for WiFi Radio/Bluetooth spaker will be set by menuconfig
+OLED display mode for WiFi Radio/Bluetooth spaker will be set by menuconfig (select BT speaker or Wifi radio)
 
 Bluetooth device name is defined in bt_config.h in include file folder. (default: "hogehoge_mont")
 
