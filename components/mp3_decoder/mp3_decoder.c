@@ -23,6 +23,7 @@
 #include "audio_player.h"
 #include "spiram_fifo.h"
 #include "mp3_decoder.h"
+#include "common_buffer.h"
 
 #define TAG "decoder"
 
@@ -33,61 +34,61 @@
 // The theoretical minimum frame size of 24 plus 8 byte MAD_BUFFER_GUARD.
 #define MIN_FRAME_SIZE (32)
 
-// read buffer
-static char read_buf[MAX_FRAME_SIZE];
-
 static long buf_underrun_cnt;
 
+/* default MAD buffer format */
+pcm_format_t mad_buffer_fmt = {
+    .sample_rate = 44100,
+    .bit_depth = I2S_BITS_PER_SAMPLE_16BIT,
+    .num_channels = 2,
+    .buffer_format = PCM_LEFT_RIGHT
+};
 
-static enum mad_flow input(struct mad_stream *stream, player_t *player) {
-    int readable_bytes, fifo_fill;
-    int rem;
-    //Shift remaining contents of buf to the front
-    rem = stream->bufend - stream->next_frame;
-    memmove(read_buf, stream->next_frame, rem);
+static enum mad_flow input(struct mad_stream *stream, buffer_t *buf, player_t *player)
+{
+    int bytes_to_read;
 
-    //while (rem < sizeof(read_buf)) {
+    // next_frame is the position MAD is interested in resuming from
+    uint32_t bytes_consumed  = stream->next_frame - stream->buffer;
+    buf_seek_rel(buf, bytes_consumed);
+
     while (1) {
 
         // stop requested, terminate immediately
-        if(player->state == STOPPED)
+        if(player->decoder_command == CMD_STOP) {
             return MAD_FLOW_STOP;
+        }
 
-        readable_bytes = (sizeof(read_buf) - rem);    // Calculate amount of bytes we need to fill buffer.
-        fifo_fill = spiRamFifoFill();
-        if (fifo_fill < readable_bytes)
-            readable_bytes = fifo_fill;                 // If the fifo can give us less, only take that amount
+        // Calculate amount of bytes we need to fill buffer.
+        bytes_to_read = min(buf_free_capacity(buf), spiRamFifoFill());
 
         // Can't take anything?
-        if (readable_bytes == 0) {
+        if (bytes_to_read == 0) {
 
             // EOF reached, stop decoder when all frames have been consumed
-            if(player->state == FINISHED) {
-                // clear the buffer
-                i2s_zero_dma_buffer(player->renderer_config->i2s_num);
+            if(player->media_stream->eof) {
                 return MAD_FLOW_STOP;
             }
 
             //Wait until there is enough data in the buffer. This only happens when the data feed
             //rate is too low, and shouldn't normally be needed!
-            printf("Buffer underflow, need %d bytes.\n", sizeof(read_buf) - rem);
+            ESP_LOGE(TAG, "Buffer underflow, need %d bytes.", buf_free_capacity(buf));
             buf_underrun_cnt++;
             //We both silence the output as well as wait a while by pushing silent samples into the i2s system.
             //This waits for about 200mS
-            i2s_zero_dma_buffer(player->renderer_config->i2s_num);
+            renderer_zero_dma_buffer();
         } else {
             //Read some bytes from the FIFO to re-fill the buffer.
-            spiRamFifoRead(&read_buf[rem], readable_bytes);
-            rem += readable_bytes;
+            fill_read_buffer(buf);
 
-            // break the loop if we have at least enough to decode the smallest possible frame
-            if(rem >= MIN_FRAME_SIZE)
+            // break the loop if we have at least enough to decode a few of the smallest possible frame
+            if(buf_data_unread(buf) >= (MIN_FRAME_SIZE * 4))
                 break;
         }
     }
 
     // Okay, let MAD decode the buffer.
-    mad_stream_buffer(stream, (unsigned char*) read_buf, sizeof(read_buf));
+    mad_stream_buffer(stream, (unsigned char*) buf->read_pos, buf_data_unread(buf));
     return MAD_FLOW_CONTINUE;
 }
 
@@ -115,10 +116,12 @@ void mp3_decoder_task(void *pvParameters)
     stream = malloc(sizeof(struct mad_stream));
     frame = malloc(sizeof(struct mad_frame));
     synth = malloc(sizeof(struct mad_synth));
+    buffer_t *buf = buf_create(MAX_FRAME_SIZE);
 
     if (stream==NULL) { printf("MAD: malloc(stream) failed\n"); return; }
     if (synth==NULL) { printf("MAD: malloc(synth) failed\n"); return; }
     if (frame==NULL) { printf("MAD: malloc(frame) failed\n"); return; }
+    if (buf==NULL) { printf("MAD: buf_create() failed\n"); return; }
 
     buf_underrun_cnt = 0;
 
@@ -129,15 +132,21 @@ void mp3_decoder_task(void *pvParameters)
     mad_frame_init(frame);
     mad_synth_init(synth);
 
-    while(player->state != STOPPED) {
+
+    while(1) {
 
         // calls mad_stream_buffer internally
-        if (input(stream, player) == MAD_FLOW_STOP ) {
+        if (input(stream, buf, player) == MAD_FLOW_STOP ) {
             break;
         }
 
         // decode frames until MAD complains
-        while(player->state != STOPPED) {
+        while(1) {
+
+            if(player->decoder_command == CMD_STOP) {
+                goto abort;
+            }
+
             // returns 0 or -1
             ret = mad_frame_decode(frame, stream);
             if (ret == -1) {
@@ -150,18 +159,45 @@ void mp3_decoder_task(void *pvParameters)
             }
             mad_synth_frame(synth, frame);
         }
-        // ESP_LOGI(TAG, "MAD decoder stack: %d\n", uxTaskGetStackHighWaterMark(NULL));
         // ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());
     }
+
+    abort:
+    // avoid noise
+    renderer_zero_dma_buffer();
 
     free(synth);
     free(frame);
     free(stream);
+    buf_destroy(buf);
 
     // clear semaphore for reader task
     spiRamFifoReset();
 
+    player->decoder_status = STOPPED;
+    player->decoder_command = CMD_NONE;
     printf("MAD: Decoder stopped.\n");
+
+    ESP_LOGI(TAG, "MAD decoder stack: %d\n", uxTaskGetStackHighWaterMark(NULL));
     vTaskDelete(NULL);
+}
+
+/* Called by the NXP modifications of libmad. Sets the needed output sample rate. */
+static int prevRate;
+void set_dac_sample_rate(int rate)
+{
+    if(rate == prevRate)
+        return;
+    prevRate = rate;
+
+    mad_buffer_fmt.sample_rate = rate;
+}
+
+/* render callback for the libmad synth */
+void render_sample_block(short *sample_buff_ch0, short *sample_buff_ch1, int num_samples, unsigned int num_channels)
+{
+    uint32_t len = num_samples * sizeof(short) * num_channels;
+    render_samples((char*) sample_buff_ch0, len, &mad_buffer_fmt);
+    return;
 }
 

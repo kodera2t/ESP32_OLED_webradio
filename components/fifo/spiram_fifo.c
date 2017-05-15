@@ -41,7 +41,7 @@ static long fifoOvfCnt, fifoUdrCnt;
 #undef SPIRAMSIZE
 //allocate enough for about one mp3 frame
 //#define SPIRAMSIZE 1850
-#define SPIRAMSIZE 64000
+#define SPIRAMSIZE 32000
 static char fakespiram[SPIRAMSIZE];
 #define spiRamInit() while(0)
 #define spiRamTest() 1
@@ -119,11 +119,12 @@ void spiRamFifoWrite(const char *buff, int buffLen) {
 
 		xSemaphoreTake(mux, portMAX_DELAY);
 		if ((SPIRAMSIZE - fifoFill) < n) {
-			printf("FIFO full.\n");
+            // printf("FIFO full.\n");
 			// Drat, not enough free room in FIFO. Wait till there's some read and try again.
 			fifoOvfCnt++;
 			xSemaphoreGive(mux);
 			xSemaphoreTake(semCanWrite, portMAX_DELAY);
+			taskYIELD();
 		} else {
 			// Write the data.
 			spiRamWrite(fifoWpos, buff, n);
