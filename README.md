@@ -1,5 +1,7 @@
 Modified for OLED display support by kodera2t
 
+Please use latest esp-idf environment (envorinment just before will make lots error)
+
 original code (w/o OLED) is
 https://github.com/MrBuddyCasino/ESP32_MP3_Decoder
 
