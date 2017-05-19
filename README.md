@@ -10,6 +10,8 @@ const char *stations[] = {
 };
 ```
 
+Push 'boot' switch to change URL.
+
 ----
 
 Modified for OLED display support by kodera2t
