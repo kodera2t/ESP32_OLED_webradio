@@ -134,6 +134,8 @@ void web_radio_stop(web_radio_t *config)
 
 void web_radio_gpio_handler_task(void *pvParams)
 {
+    extern void init_station(int);
+	extern void software_reset();
     gpio_handler_param_t *params = pvParams;
     web_radio_t *config = params->user_data;
     xQueueHandle gpio_evt_queue = params->gpio_evt_queue;
@@ -147,6 +149,8 @@ void web_radio_gpio_handler_task(void *pvParams)
                 case RUNNING:
                     printf("stopping player\n");
                     web_radio_stop(config);
+                    init_station(1);
+					software_reset();
                     break;
 
                 case STOPPED:
