@@ -85,7 +85,12 @@ static void i2c_test(void)
       SSD1306_Puts(url + 18, &Font_7x10, SSD1306_COLOR_WHITE);
     }
     SSD1306_GotoXY(16, 53);
-    SSD1306_Puts("Yeah! Radio!!", &Font_7x10, SSD1306_COLOR_WHITE);    
+
+	tcpip_adapter_ip_info_t ip_info;
+	tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
+	SSD1306_GotoXY(2, 53);
+	SSD1306_Puts("IP:", &Font_7x10, SSD1306_COLOR_WHITE);
+	SSD1306_Puts(ip4addr_ntoa(&ip_info.ip), &Font_7x10, SSD1306_COLOR_WHITE);    
     #endif
 
     
