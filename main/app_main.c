@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <nvs.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -43,15 +44,27 @@
 #define I2C_EXAMPLE_MASTER_RX_BUF_DISABLE   0   /*!< I2C master do not need buffer */
 #define I2C_EXAMPLE_MASTER_FREQ_HZ    100000     /*!< I2C master clock frequency */
 
+/* */
+
+static uint8_t station_no = 0;
+const char *stations[] = {
+  "http://wbgo.streamguys.net/wbgo96",
+  "http://wbgo.streamguys.net/thejazzstream",
+  "http://icecast.omroep.nl/3fm-sb-mp3",
+};
+
+char* play_url() {
+  return (char*)stations[station_no];
+}
+
 xSemaphoreHandle print_mux;
 
 static void i2c_test(void)
 {
-    char station[100];
-    strcpy(station,PLAY_URL);
+    char *url = play_url();
+  
     SSD1306_GotoXY(40, 4);
     SSD1306_Puts("ESP32", &Font_11x18, SSD1306_COLOR_WHITE);
-    
     
     SSD1306_GotoXY(2, 20);
     #ifdef CONFIG_BT_SPEAKER_MODE /////bluetooth speaker mode/////
@@ -65,13 +78,19 @@ static void i2c_test(void)
     #else ////////for webradio mode display////////////////
     SSD1306_Puts("PCM5102A webradio", &Font_7x10, SSD1306_COLOR_WHITE);
     SSD1306_GotoXY(2, 30);
-    SSD1306_Puts(PLAY_URL, &Font_7x10, SSD1306_COLOR_WHITE);
-    SSD1306_GotoXY(2, 39);
-    for(int i=18;i<38;i++){
-        SSD1306_Putc(station[i], &Font_7x10, SSD1306_COLOR_WHITE);
+    
+    SSD1306_Puts(url, &Font_7x10, SSD1306_COLOR_WHITE);
+    if (strlen(url) > 18)  {
+      SSD1306_GotoXY(2, 39);
+      SSD1306_Puts(url + 18, &Font_7x10, SSD1306_COLOR_WHITE);
     }
     SSD1306_GotoXY(16, 53);
-    SSD1306_Puts("Yeah! Radio!!", &Font_7x10, SSD1306_COLOR_WHITE);    
+
+	tcpip_adapter_ip_info_t ip_info;
+	tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
+	SSD1306_GotoXY(2, 53);
+	SSD1306_Puts("IP:", &Font_7x10, SSD1306_COLOR_WHITE);
+	SSD1306_Puts(ip4addr_ntoa(&ip_info.ip), &Font_7x10, SSD1306_COLOR_WHITE);    
     #endif
 
     
@@ -278,11 +297,26 @@ static renderer_config_t *create_renderer_config()
     return renderer_config;
 }
 
+void init_station(int sw) {
+  nvs_handle h;
+  const char *key = "Station No";
+  nvs_open("STATION", NVS_READWRITE, &h);
+  if (nvs_get_u8(h, key, &station_no) != ESP_OK || station_no >= sizeof(stations)/sizeof(char*)) {
+    station_no = 0;
+  }
+  ESP_LOGI(TAG, "%s:%d %s", key, (int)station_no, stations[station_no]);
+  nvs_set_u8(h, key, station_no + (sw ? 1: 0));
+  nvs_commit(h);
+  nvs_close(h);
+}
+
 static void start_web_radio()
 {
+    init_station(0);
+
     // init web radio
     web_radio_t *radio_config = calloc(1, sizeof(web_radio_t));
-    radio_config->url = PLAY_URL;
+    radio_config->url = play_url(); /* PLAY_URL; */
 
     // init player config
     radio_config->player_config = calloc(1, sizeof(player_t));

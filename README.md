@@ -1,3 +1,19 @@
+Modified for multi URL support by n24bass
+
+URLs declared in app_main.c
+
+```
+const char *stations[] = {
+  "http://wbgo.streamguys.net/wbgo96",
+  "http://wbgo.streamguys.net/thejazzstream",
+  "http://icecast.omroep.nl/3fm-sb-mp3",
+};
+```
+
+Push 'boot' switch to change URL.
+
+----
+
 Modified for OLED display support by kodera2t
 
 Please use latest esp-idf environment (envorinment just before will make lots error)
