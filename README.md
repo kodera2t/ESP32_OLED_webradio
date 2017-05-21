@@ -1,3 +1,6 @@
+Station switch is changed from GPIO0 to GPIO16 for ESP32-ADB. General ESP32 developing board has GPIO0 switch so if your board has one, please change it in components/controls/controls.c
+
+----
 Modified for multi URL support by n24bass
 
 URLs declared in app_main.c
