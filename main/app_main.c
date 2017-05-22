@@ -51,7 +51,7 @@
 
 const static char http_html_hdr[] = "HTTP/1.1 200 OK\r\nContent-type: text/html\r\n\r\n";
 const static char http_index_hml1[] = "<html><head><title>ESP32 PCM5102A webradio</title></head><body><h1>Now Playing</h1>";
-const static char http_index_hml2[] = "</body></html>";
+const static char http_index_hml2[] = "<br><a href=\"P\">PREV</a>&nbsp;<a href=\"N\">NEXT</a></body></html>";
 
 /* */
 
@@ -310,11 +310,15 @@ void init_station(int sw) {
   nvs_handle h;
   const char *key = "Station No";
   nvs_open("STATION", NVS_READWRITE, &h);
-  if (nvs_get_u8(h, key, &station_no) != ESP_OK || station_no >= sizeof(stations)/sizeof(char*)) {
+  if (nvs_get_u8(h, key, &station_no) != ESP_OK) {
     station_no = 0;
+  } else {
+	station_no %= (sizeof(stations)/sizeof(char*));
   }
   ESP_LOGI(TAG, "%s:%d %s", key, (int)station_no, stations[station_no]);
-  nvs_set_u8(h, key, station_no + (sw ? 1: 0));
+  if (sw < 0) station_no += sizeof(stations)/sizeof(char*) - 1;
+  else station_no += sw;
+  nvs_set_u8(h, key, station_no);
   nvs_commit(h);
   nvs_close(h);
 }
@@ -356,6 +360,7 @@ http_server_netconn_serve(struct netconn *conn)
   err = netconn_recv(conn, &inbuf);
 
   if (err == ERR_OK) {
+	int np = 0;
     netbuf_data(inbuf, (void**)&buf, &buflen);
 
     /* Is this an HTTP GET command? (only check the first 5 chars, since
@@ -366,31 +371,40 @@ http_server_netconn_serve(struct netconn *conn)
         buf[2]=='T' &&
         buf[3]==' ' &&
         buf[4]=='/' ) {
-          printf("%c\n", buf[5]);
+	  printf("%c\n", buf[5]);
       /* Send the HTML header
-             * subtract 1 from the size, since we dont send the \0 in the string
-             * NETCONN_NOCOPY: our data is const static, so no need to copy it
+	   * subtract 1 from the size, since we dont send the \0 in the string
+	   * NETCONN_NOCOPY: our data is const static, so no need to copy it
        */
-#if 0
-       gpio_pad_select_gpio(DIODE_PIN);
-       /* Set the GPIO as a push/pull output */
-       gpio_set_direction(DIODE_PIN, GPIO_MODE_OUTPUT);
-       if(buf[5]=='h'){
-         gpio_set_level(DIODE_PIN,1);
-       }
-       if(buf[5]=='l'){
-         gpio_set_level(DIODE_PIN,0);
-       }
-#endif
+	  if (buflen > 5) {
+		switch (buf[5]) {
+		case 'N':
+		  np = 1; break;
+		case 'P':
+		  np = -1; break;
+		default:
+		  break;
+		}
+	  }
+
       netconn_write(conn, http_html_hdr, sizeof(http_html_hdr)-1, NETCONN_NOCOPY);
 
       /* Send our HTML page */
       /* netconn_write(conn, http_index_hml, sizeof(http_index_hml)-1, NETCONN_NOCOPY); */
+	  if (np != 0)
+		init_station(np);
 	  buf = play_url();
 	  netconn_write(conn, http_index_hml1, sizeof(http_index_hml1)-1, NETCONN_NOCOPY);
 	  netconn_write(conn, buf, strlen(buf), NETCONN_NOCOPY);
 	  netconn_write(conn, http_index_hml2, sizeof(http_index_hml2)-1, NETCONN_NOCOPY);
-    }
+
+	  if (np != 0) {
+		extern void software_reset();
+		netconn_close(conn);
+		netbuf_delete(inbuf);
+		software_reset();
+	  }
+	}
 
   }
   /* Close the connection (server closes in HTTP) */
