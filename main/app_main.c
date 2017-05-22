@@ -15,6 +15,10 @@
 #include "http.h"
 #include "driver/i2s.h"
 
+#include "lwip/sys.h"
+#include "lwip/netdb.h"
+#include "lwip/api.h"
+
 #include "ui.h"
 #include "spiram_fifo.h"
 #include "audio_renderer.h"
@@ -43,6 +47,11 @@
 #define I2C_EXAMPLE_MASTER_TX_BUF_DISABLE   0   /*!< I2C master do not need buffer */
 #define I2C_EXAMPLE_MASTER_RX_BUF_DISABLE   0   /*!< I2C master do not need buffer */
 #define I2C_EXAMPLE_MASTER_FREQ_HZ    100000     /*!< I2C master clock frequency */
+
+
+const static char http_html_hdr[] = "HTTP/1.1 200 OK\r\nContent-type: text/html\r\n\r\n";
+const static char http_index_hml1[] = "<html><head><title>ESP32 PCM5102A webradio</title></head><body><h1>Now Playing</h1>";
+const static char http_index_hml2[] = "</body></html>";
 
 /* */
 
@@ -334,6 +343,83 @@ static void start_web_radio()
     web_radio_start(radio_config);
 }
 
+static void
+http_server_netconn_serve(struct netconn *conn)
+{
+  struct netbuf *inbuf;
+  char *buf;
+  u16_t buflen;
+  err_t err;
+
+  /* Read the data from the port, blocking if nothing yet there.
+   We assume the request (the part we care about) is in one netbuf */
+  err = netconn_recv(conn, &inbuf);
+
+  if (err == ERR_OK) {
+    netbuf_data(inbuf, (void**)&buf, &buflen);
+
+    /* Is this an HTTP GET command? (only check the first 5 chars, since
+    there are other formats for GET, and we're keeping it very simple )*/
+    if (buflen>=5 &&
+        buf[0]=='G' &&
+        buf[1]=='E' &&
+        buf[2]=='T' &&
+        buf[3]==' ' &&
+        buf[4]=='/' ) {
+          printf("%c\n", buf[5]);
+      /* Send the HTML header
+             * subtract 1 from the size, since we dont send the \0 in the string
+             * NETCONN_NOCOPY: our data is const static, so no need to copy it
+       */
+#if 0
+       gpio_pad_select_gpio(DIODE_PIN);
+       /* Set the GPIO as a push/pull output */
+       gpio_set_direction(DIODE_PIN, GPIO_MODE_OUTPUT);
+       if(buf[5]=='h'){
+         gpio_set_level(DIODE_PIN,1);
+       }
+       if(buf[5]=='l'){
+         gpio_set_level(DIODE_PIN,0);
+       }
+#endif
+      netconn_write(conn, http_html_hdr, sizeof(http_html_hdr)-1, NETCONN_NOCOPY);
+
+      /* Send our HTML page */
+      /* netconn_write(conn, http_index_hml, sizeof(http_index_hml)-1, NETCONN_NOCOPY); */
+	  buf = play_url();
+	  netconn_write(conn, http_index_hml1, sizeof(http_index_hml1)-1, NETCONN_NOCOPY);
+	  netconn_write(conn, buf, strlen(buf), NETCONN_NOCOPY);
+	  netconn_write(conn, http_index_hml2, sizeof(http_index_hml2)-1, NETCONN_NOCOPY);
+    }
+
+  }
+  /* Close the connection (server closes in HTTP) */
+  netconn_close(conn);
+
+  /* Delete the buffer (netconn_recv gives us ownership,
+   so we have to make sure to deallocate the buffer) */
+  netbuf_delete(inbuf);
+}
+
+static void http_server(void *pvParameters)
+{
+  struct netconn *conn, *newconn;
+  err_t err;
+  conn = netconn_new(NETCONN_TCP);
+  netconn_bind(conn, NULL, 80);
+  netconn_listen(conn);
+  do {
+     err = netconn_accept(conn, &newconn);
+     if (err == ERR_OK) {
+       http_server_netconn_serve(newconn);
+       netconn_delete(newconn);
+     }
+   } while(err == ERR_OK);
+   netconn_close(conn);
+   netconn_delete(conn);
+}
+
+
 /**
  * entry point
  */
@@ -356,4 +442,5 @@ void app_main()
     i2c_test();
     ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());
     // ESP_LOGI(TAG, "app_main stack: %d\n", uxTaskGetStackHighWaterMark(NULL));
+	xTaskCreate(&http_server, "http_server", 2048, NULL, 5, NULL);
 }
