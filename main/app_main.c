@@ -18,6 +18,7 @@
 #include "lwip/sys.h"
 #include "lwip/netdb.h"
 #include "lwip/api.h"
+#include "lwip/tcp.h"
 
 #include "ui.h"
 #include "spiram_fifo.h"
@@ -50,8 +51,9 @@
 
 
 const static char http_html_hdr[] = "HTTP/1.1 200 OK\r\nContent-type: text/html\r\n\r\n";
-const static char http_index_hml1[] = "<html><head><title>ESP32 PCM5102A webradio</title></head><body><h1>Now Playing</h1>";
-const static char http_index_hml2[] = "<br><a href=\"P\">PREV</a>&nbsp;<a href=\"N\">NEXT</a></body></html>";
+const static char http_index_html0[] = "<html><head><title>ESP32 PCM5102A webradio</title></head><body><h1>Next Playing</h1>";
+const static char http_index_html1[] = "<html><head><title>ESP32 PCM5102A webradio</title></head><body><h1>Now Playing</h1>";
+const static char http_index_html2[] = "<br><a href=\"P\">prev</a>&nbsp;<a href=\"N\">next</a></body></html>";
 
 /* */
 
@@ -71,12 +73,14 @@ xSemaphoreHandle print_mux;
 static void i2c_test(void)
 {
     char *url = play_url();
-  
+
+    SSD1306_Fill(SSD1306_COLOR_BLACK); // clear screen
+
     SSD1306_GotoXY(40, 4);
     SSD1306_Puts("ESP32", &Font_11x18, SSD1306_COLOR_WHITE);
     
     SSD1306_GotoXY(2, 20);
-    #ifdef CONFIG_BT_SPEAKER_MODE /////bluetooth speaker mode/////
+#ifdef CONFIG_BT_SPEAKER_MODE /////bluetooth speaker mode/////
     SSD1306_Puts("PCM5102 BT speaker", &Font_7x10, SSD1306_COLOR_WHITE);
     SSD1306_GotoXY(2, 30);
     SSD1306_Puts("my device name is", &Font_7x10, SSD1306_COLOR_WHITE);
@@ -84,7 +88,7 @@ static void i2c_test(void)
     SSD1306_Puts(dev_name, &Font_7x10, SSD1306_COLOR_WHITE);
     SSD1306_GotoXY(16, 53);
     SSD1306_Puts("Yeah! Speaker!", &Font_7x10, SSD1306_COLOR_WHITE);
-    #else ////////for webradio mode display////////////////
+#else ////////for webradio mode display////////////////
     SSD1306_Puts("PCM5102A webradio", &Font_7x10, SSD1306_COLOR_WHITE);
     SSD1306_GotoXY(2, 30);
     
@@ -95,15 +99,12 @@ static void i2c_test(void)
     }
     SSD1306_GotoXY(16, 53);
 
-	tcpip_adapter_ip_info_t ip_info;
-	tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
-	SSD1306_GotoXY(2, 53);
-	SSD1306_Puts("IP:", &Font_7x10, SSD1306_COLOR_WHITE);
-	SSD1306_Puts(ip4addr_ntoa(&ip_info.ip), &Font_7x10, SSD1306_COLOR_WHITE);    
-    #endif
-
-    
-    
+    tcpip_adapter_ip_info_t ip_info;
+    tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
+    SSD1306_GotoXY(2, 53);
+    SSD1306_Puts("IP:", &Font_7x10, SSD1306_COLOR_WHITE);
+    SSD1306_Puts(ip4addr_ntoa(&ip_info.ip), &Font_7x10, SSD1306_COLOR_WHITE);    
+#endif
 
     /* Update screen, send changes to LCD */
     SSD1306_UpdateScreen();
@@ -157,14 +158,7 @@ static void i2c_example_master_init()
 
 #define WIFI_LIST_NUM   10
 
-
 #define TAG "main"
-
-
-
-
-
-
 
 
 //Priorities of the reader and the decoder thread. bigger number = higher prio
@@ -309,43 +303,50 @@ static renderer_config_t *create_renderer_config()
 void init_station(int sw) {
   nvs_handle h;
   const char *key = "Station No";
+
   nvs_open("STATION", NVS_READWRITE, &h);
-  if (nvs_get_u8(h, key, &station_no) != ESP_OK) {
+  if (nvs_get_u8(h, key, &station_no) != ESP_OK)
     station_no = 0;
-  } else {
-	station_no %= (sizeof(stations)/sizeof(char*));
-  }
-  ESP_LOGI(TAG, "%s:%d %s", key, (int)station_no, stations[station_no]);
-  if (sw < 0) station_no += sizeof(stations)/sizeof(char*) - 1;
-  else station_no += sw;
+  else
+    station_no %= (sizeof(stations)/sizeof(char*));
+  station_no = (station_no + sw) % (sizeof(stations)/sizeof(char*));
   nvs_set_u8(h, key, station_no);
   nvs_commit(h);
   nvs_close(h);
 }
 
+web_radio_t *radio_config = NULL;
+
 static void start_web_radio()
 {
     init_station(0);
 
-    // init web radio
-    web_radio_t *radio_config = calloc(1, sizeof(web_radio_t));
+    if (radio_config == NULL) {
+      // init web radio
+      radio_config = calloc(1, sizeof(web_radio_t));
+
+      // init player config
+      radio_config->player_config = calloc(1, sizeof(player_t));
+      radio_config->player_config->command = CMD_NONE;
+      radio_config->player_config->decoder_status = UNINITIALIZED;
+      radio_config->player_config->decoder_command = CMD_NONE;
+      radio_config->player_config->buffer_pref = BUF_PREF_SAFE;
+      radio_config->player_config->media_stream = calloc(1, sizeof(media_stream_t));
+
+      // init renderer
+      renderer_init(create_renderer_config());
+    }
+
     radio_config->url = play_url(); /* PLAY_URL; */
-
-    // init player config
-    radio_config->player_config = calloc(1, sizeof(player_t));
-    radio_config->player_config->command = CMD_NONE;
-    radio_config->player_config->decoder_status = UNINITIALIZED;
-    radio_config->player_config->decoder_command = CMD_NONE;
-    radio_config->player_config->buffer_pref = BUF_PREF_SAFE;
-    radio_config->player_config->media_stream = calloc(1, sizeof(media_stream_t));
-
-    // init renderer
-    renderer_init(create_renderer_config());
 
     // start radio
     web_radio_init(radio_config);
     web_radio_start(radio_config);
 }
+
+/*
+   web interface
+ */
 
 static void
 http_server_netconn_serve(struct netconn *conn)
@@ -355,12 +356,14 @@ http_server_netconn_serve(struct netconn *conn)
   u16_t buflen;
   err_t err;
 
+  int np = 0;
+  extern void software_reset();
+
   /* Read the data from the port, blocking if nothing yet there.
    We assume the request (the part we care about) is in one netbuf */
   err = netconn_recv(conn, &inbuf);
 
   if (err == ERR_OK) {
-	int np = 0;
     netbuf_data(inbuf, (void**)&buf, &buflen);
 
     /* Is this an HTTP GET command? (only check the first 5 chars, since
@@ -371,40 +374,34 @@ http_server_netconn_serve(struct netconn *conn)
         buf[2]=='T' &&
         buf[3]==' ' &&
         buf[4]=='/' ) {
-	  printf("%c\n", buf[5]);
+      printf("%c\n", buf[5]);
       /* Send the HTML header
-	   * subtract 1 from the size, since we dont send the \0 in the string
-	   * NETCONN_NOCOPY: our data is const static, so no need to copy it
+       * subtract 1 from the size, since we dont send the \0 in the string
+       * NETCONN_NOCOPY: our data is const static, so no need to copy it
        */
-	  if (buflen > 5) {
-		switch (buf[5]) {
-		case 'N':
-		  np = 1; break;
-		case 'P':
-		  np = -1; break;
-		default:
-		  break;
-		}
-	  }
+      if (buflen > 5) {
+        switch (buf[5]) {
+        case 'N':
+          np = 1; break;
+        case 'P':
+          np = -1; break;
+        default:
+          break;
+        }
+      }
 
       netconn_write(conn, http_html_hdr, sizeof(http_html_hdr)-1, NETCONN_NOCOPY);
 
+      if (np != 0) init_station(np);
+      buf = play_url();
+	  
       /* Send our HTML page */
-      /* netconn_write(conn, http_index_hml, sizeof(http_index_hml)-1, NETCONN_NOCOPY); */
-	  if (np != 0)
-		init_station(np);
-	  buf = play_url();
-	  netconn_write(conn, http_index_hml1, sizeof(http_index_hml1)-1, NETCONN_NOCOPY);
-	  netconn_write(conn, buf, strlen(buf), NETCONN_NOCOPY);
-	  netconn_write(conn, http_index_hml2, sizeof(http_index_hml2)-1, NETCONN_NOCOPY);
-
-	  if (np != 0) {
-		extern void software_reset();
-		netconn_close(conn);
-		netbuf_delete(inbuf);
-		software_reset();
-	  }
-	}
+      // conn->pcb.tcp->flags |= TF_NODELAY;
+      if (np) netconn_write(conn, http_index_html0, sizeof(http_index_html0)-1, NETCONN_NOCOPY);
+      else    netconn_write(conn, http_index_html1, sizeof(http_index_html1)-1, NETCONN_NOCOPY);
+      netconn_write(conn, buf, strlen(buf), NETCONN_NOCOPY);
+      netconn_write(conn, http_index_html2, sizeof(http_index_html2)-1, NETCONN_NOCOPY);
+    }
 
   }
   /* Close the connection (server closes in HTTP) */
@@ -413,6 +410,15 @@ http_server_netconn_serve(struct netconn *conn)
   /* Delete the buffer (netconn_recv gives us ownership,
    so we have to make sure to deallocate the buffer) */
   netbuf_delete(inbuf);
+
+  if (np != 0) {
+    netconn_delete(conn);
+
+    vTaskDelay(3000/portTICK_RATE_MS);
+    printf("software_reset\n");
+    software_reset();
+    vTaskDelete(NULL);
+  }
 }
 
 static void http_server(void *pvParameters)
@@ -456,5 +462,5 @@ void app_main()
     i2c_test();
     ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());
     // ESP_LOGI(TAG, "app_main stack: %d\n", uxTaskGetStackHighWaterMark(NULL));
-	xTaskCreate(&http_server, "http_server", 2048, NULL, 5, NULL);
+    xTaskCreate(&http_server, "http_server", 2048, NULL, 5, NULL);
 }
