@@ -105,14 +105,14 @@ static void http_get_task(void *pvParameters)
 
     // blocks until end of stream
     int result = http_client_get(radio_conf->url, &callbacks,
-            radio_conf->player_config);
+                                 radio_conf->player_config);
 
     if (result != 0) {
         ESP_LOGE(TAG, "http_client_get error");
     } else {
         ESP_LOGI(TAG, "http_client_get completed");
     }
-    // ESP_LOGI(TAG, "http_client_get stack: %d\n", uxTaskGetStackHighWaterMark(NULL));
+    ESP_LOGI(TAG, "http_client_get stack: %d\n", uxTaskGetStackHighWaterMark(NULL));
 
     vTaskDelete(NULL);
 }
@@ -121,7 +121,7 @@ void web_radio_start(web_radio_t *config)
 {
     // start reader task
     xTaskCreatePinnedToCore(&http_get_task, "http_get_task", 2560, config, 20,
-    NULL, 0);
+                            NULL, 0);
 }
 
 void web_radio_stop(web_radio_t *config)
@@ -134,8 +134,9 @@ void web_radio_stop(web_radio_t *config)
 
 void web_radio_gpio_handler_task(void *pvParams)
 {
-    extern void init_station(int);
-	extern void software_reset();
+    extern void software_reset();
+    extern char *init_url(int);
+  
     gpio_handler_param_t *params = pvParams;
     web_radio_t *config = params->user_data;
     xQueueHandle gpio_evt_queue = params->gpio_evt_queue;
@@ -146,20 +147,20 @@ void web_radio_gpio_handler_task(void *pvParams)
             printf("GPIO[%d] intr, val: %d\n", io_num, gpio_get_level(io_num));
 
             switch (get_player_status()) {
-                case RUNNING:
-                    printf("stopping player\n");
-                    web_radio_stop(config);
-                    init_station(1);
-					software_reset();
-                    break;
+            case RUNNING:
+                printf("stopping player\n");
+                web_radio_stop(config);
+                init_url(1);
+                software_reset();
+                break;
 
-                case STOPPED:
-                    printf("starting player\n");
-                    web_radio_start(config);
-                    break;
+            case STOPPED:
+                printf("starting player\n");
+                web_radio_start(config);
+                break;
 
-                default:
-                    printf("player state: %d\n", get_player_status());
+            default:
+                printf("player state: %d\n", get_player_status());
             }
         }
     }
