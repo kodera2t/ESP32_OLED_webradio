@@ -539,12 +539,13 @@ http_server_netconn_serve(struct netconn *conn)
       for (int i = 0; i < stno_max; i++) {
         char buf[MAXURLLEN];
         int length = MAXURLLEN;
+        sprintf(buf, "<li><a href=\"/%d\">", i);
+        netconn_write(conn, buf, strlen(buf), NETCONN_NOCOPY);
         get_nvurl(i, buf, length);
-        netconn_write(conn, "<li>", 4, NETCONN_NOCOPY);
         if (i == stno) netconn_write(conn, "<b>", 3, NETCONN_NOCOPY);
         netconn_write(conn, buf, strlen(buf), NETCONN_NOCOPY);
-        if (i == stno) netconn_write(conn, "</b>", 4, NETCONN_NOCOPY);
-        netconn_write(conn, "</li>", 5, NETCONN_NOCOPY);
+        if (i == stno) netconn_write(conn, "</b> - now playing", 24, NETCONN_NOCOPY);
+        netconn_write(conn, "</a></li>", 9, NETCONN_NOCOPY);
       }
       netconn_write(conn, http_e, sizeof(http_e)-1, NETCONN_NOCOPY);
     }
