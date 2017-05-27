@@ -57,7 +57,7 @@ const static char http_e[] = "</ul><a href=\"P\">prev</a>&nbsp;<a href=\"N\">nex
 
 /* */
 
-#define NVSNAME	"STATION"
+#define NVSNAME "STATION"
 #define MAXURLLEN 128
 #define MAXSTATION 10
 
@@ -68,6 +68,8 @@ static const char *preset_url = "http://wbgo.streamguys.net/wbgo96"; // preset s
   "http://stream.srg-ssr.ch/m/rsj/mp3_128",
   "http://37.187.79.93:8368/stream2",
   "http://icecast.omroep.nl/3fm-sb-mp3",
+  "http://beatles.purestream.net/beatles.mp3",
+  "http://listen.181fm.com/181-beatles_128k.mp3",
 */
 
 static uint8_t stno; // current station index no 
@@ -96,10 +98,14 @@ char *init_url(int d) {
   nvs_get_u8(h, key_i, &stno);
 
   while (1) {
-    stno = (stno + d) % stno_max;
+    if (stno + d >= 0)
+      stno = (stno + d) % stno_max;
+    else
+      stno = (stno + d + stno_max) % stno_max;
     index[0] = '0' + stno;
     e = nvs_get_str(h, index, sturl, &length);
     if (e == ESP_OK) break;
+    if (abs(d) > 1) d = d / abs(d);
   }
 
   if (d != 0) nvs_set_u8(h, key_i, stno);
@@ -120,11 +126,11 @@ char *set_url(int d, char *url) {
   printf("set_url(%d, %s) stno_max=%d\n", d, url, stno_max);
   
   if (strlen(url) >= MAXURLLEN) return NULL;
-	
+
   if (d > stno_max || d < 0) d = stno_max;
   if (d == stno_max) stno_max++;
   if (stno_max > MAXSTATION) return NULL; // error
-	
+
   nvs_open(NVSNAME, NVS_READWRITE, &h);
 
   stno = d;
@@ -150,7 +156,7 @@ char *get_nvurl(int n, char *buf, size_t length) {
   // length = MAXURLLEN;
 
   n %= stno_max;
-	
+
   nvs_open(NVSNAME, NVS_READWRITE, &h);
   index[0] += n;
   if (nvs_get_str(h, index, buf, &length) != OK) {
@@ -169,6 +175,20 @@ void erase_nvurl(int n) {
   nvs_open(NVSNAME, NVS_READWRITE, &h);
   index[0] += n;
   nvs_erase_key(h, index);
+
+  stno_max--;
+  nvs_set_u8(h, key_n, stno_max);
+
+  for (;n < stno_max; n++) {
+    char buf[MAXURLLEN];
+    size_t length = MAXURLLEN;
+
+    index[0] = '0' + n + 1;
+    nvs_get_str(h, index, buf, &length);
+    index[0]--;
+    nvs_set_str(h, index, buf);
+  }
+
   nvs_commit(h);
   nvs_close(h);
 }
@@ -479,33 +499,34 @@ http_server_netconn_serve(struct netconn *conn)
           np = 1; break;
         case 'P':
           np = -1; break;
-	case '0':
-	case '1':
-	case '2':
-	case '3':
-	case '4':
-	case '5':
-	case '6':
-	case '7':
-	case '8':
-	case '9':
-	  {
-	    int i = buf[5] - '0';
-	    if (i > stno_max) i = stno_max;
-	    if (buf[6] == '+') {
-	      if (strncmp(buf + 7, "http://", 7) == 0) {
-		np = i - stno;
-		if (i == stno_max) stno_max++;
-		char *p = strchr(buf + 7, ' ');
-		*p = '\0';
-		set_url(i, buf + 7);
-	      }
-	    } else if (buf[6] == '-') {
-	      erase_nvurl(i);
-	    } else {
-	      np = i - stno;
-	    }
-	  }
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+          {
+            int i = buf[5] - '0';
+            if (i > stno_max) i = stno_max;
+            if (buf[6] == '+') {
+              if (strncmp(buf + 7, "http://", 7) == 0) {
+                np = i - stno;
+                if (i == stno_max) stno_max++;
+                char *p = strchr(buf + 7, ' ');
+                *p = '\0';
+                set_url(i, buf + 7);
+              }
+            } else if (buf[6] == '-') {
+              erase_nvurl(i);
+              np = -1;
+            } else {
+              np = i - stno;
+            }
+          }
         default:
           break;
         }
@@ -516,14 +537,14 @@ http_server_netconn_serve(struct netconn *conn)
       /* Send our HTML page */
       netconn_write(conn, http_t, sizeof(http_t)-1, NETCONN_NOCOPY);
       for (int i = 0; i < stno_max; i++) {
-	char buf[MAXURLLEN];
-	int length = MAXURLLEN;
-	get_nvurl(i, buf, length);
-	netconn_write(conn, "<li>", 4, NETCONN_NOCOPY);
-	if (i == stno) netconn_write(conn, "<b>", 3, NETCONN_NOCOPY);
-	netconn_write(conn, buf, strlen(buf), NETCONN_NOCOPY);
-	if (i == stno) netconn_write(conn, "</b>", 4, NETCONN_NOCOPY);
-	netconn_write(conn, "</li>", 5, NETCONN_NOCOPY);
+        char buf[MAXURLLEN];
+        int length = MAXURLLEN;
+        get_nvurl(i, buf, length);
+        netconn_write(conn, "<li>", 4, NETCONN_NOCOPY);
+        if (i == stno) netconn_write(conn, "<b>", 3, NETCONN_NOCOPY);
+        netconn_write(conn, buf, strlen(buf), NETCONN_NOCOPY);
+        if (i == stno) netconn_write(conn, "</b>", 4, NETCONN_NOCOPY);
+        netconn_write(conn, "</li>", 5, NETCONN_NOCOPY);
       }
       netconn_write(conn, http_e, sizeof(http_e)-1, NETCONN_NOCOPY);
     }
