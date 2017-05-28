@@ -1,16 +1,17 @@
 Modified for multi URL support by n24bass
 
-URLs declared in app_main.c
+Add web interface.
 
 ```
-const char *stations[] = {
-  "http://wbgo.streamguys.net/wbgo96",
-  "http://wbgo.streamguys.net/thejazzstream",
-  "http://icecast.omroep.nl/3fm-sb-mp3",
-};
+http://address_of_ESP32/  - list stations
+http://address_of_ESP32/P - change to previous station
+http://address_of_ESP32/N - change to next station
+http://address_of_ESP32/[0..9] - select station
+http://address_of_ESP32/[0..]+URL - set station URL
+http://address_of_ESP32/[0..]-URL - remove station URL
 ```
 
-Push 'boot' switch to change URL.
+Push 'boot' switch to change next station.
 
 ----
 
