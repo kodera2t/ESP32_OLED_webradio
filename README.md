@@ -1,14 +1,14 @@
 Modified for multi URL support by n24bass
 
-Add web interface.
+Add web interface. You can add (up to 10), change or remove URL of the internet radio station. 
 
 ```
-http://address_of_ESP32/  - list stations
-http://address_of_ESP32/P - change to previous station
-http://address_of_ESP32/N - change to next station
-http://address_of_ESP32/[0..9] - select station
-http://address_of_ESP32/[0..]+URL - set station URL
-http://address_of_ESP32/[0..]-URL - remove station URL
+GET /  - list stations
+GET /P - change to previous station
+GET /N - change to next station
+GET /0..9 - select station
+GET /0..9+URL - set station URL
+GET /0..-URL - remove station URL
 ```
 
 Push 'boot' switch to change next station.
