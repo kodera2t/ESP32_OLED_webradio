@@ -11,7 +11,9 @@ GET /0..9+URL - set station URL
 GET /0..-URL - remove station URL
 ```
 
-Push 'boot' switch to change next station.
+Push 'GPIO-16' (chaned from 'boot') switch to change next station.
+
+It starts up only web interface when GPIO-16 is keeped low level at boot time.
 
 ----
 
