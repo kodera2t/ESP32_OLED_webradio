@@ -41,7 +41,7 @@ void controls_init(TaskFunction_t gpio_handler_task, const uint16_t usStackDepth
     //interrupt of rising edge
     io_conf.intr_type = GPIO_PIN_INTR_POSEDGE;
     //bit mask of the pins, use GPIO0 here ("Boot" button)
-    io_conf.pin_bit_mask = (1 << GPIO_NUM_0);
+    io_conf.pin_bit_mask = (1 << GPIO_NUM_16);
     //set as input mode
     io_conf.mode = GPIO_MODE_INPUT;
     //disable pull-down mode
@@ -63,10 +63,10 @@ void controls_init(TaskFunction_t gpio_handler_task, const uint16_t usStackDepth
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
 
     // remove existing handler that may be present
-    gpio_isr_handler_remove(GPIO_NUM_0);
+    gpio_isr_handler_remove(GPIO_NUM_16);
 
     //hook isr handler for specific gpio pin
-    gpio_isr_handler_add(GPIO_NUM_0, gpio_isr_handler, (void*) GPIO_NUM_0);
+    gpio_isr_handler_add(GPIO_NUM_16, gpio_isr_handler, (void*) GPIO_NUM_16);
 }
 
 void controls_destroy()
