@@ -62,6 +62,8 @@ const static char http_e[] = "</ul><a href=\"P\">prev</a>&nbsp;<a href=\"N\">nex
 #define MAXSTATION 10
 
 static const char *preset_url = "http://wbgo.streamguys.net/wbgo96"; // preset station URL
+// static const char *preset_url = "http://wbgo-web.streamguys.net/audio/wbgo_8000.asx";
+// static const char *preset_url = "http://wbgo.streamguys.net/thejazzstream";
 /*
   "http://wbgo.streamguys.net/wbgo96",
   "http://wbgo.streamguys.net/thejazzstream",
@@ -86,6 +88,9 @@ char *init_url(int d) {
   esp_err_t e;
 
   nvs_open(NVSNAME, NVS_READWRITE, &h);
+#if 0
+  nvs_erase_all(h);
+#endif
 
   if (nvs_get_u8(h, key_n, &stno_max) != ESP_OK) {
     stno = 0;
@@ -196,6 +201,14 @@ void erase_nvurl(int n) {
 /* */
 
 xSemaphoreHandle print_mux;
+
+void i2c_clear(void)
+{
+    SSD1306_Fill(SSD1306_COLOR_BLACK); // clear screen
+    SSD1306_GotoXY(40, 4);
+    SSD1306_Puts("ESP32", &Font_11x18, SSD1306_COLOR_WHITE);
+    SSD1306_UpdateScreen();
+}
 
 void i2c_test(void)
 {
@@ -406,6 +419,8 @@ static void start_wifi()
     ui_queue_event(UI_CONNECTED);
 }
 
+static void http_server(void *pvParameters);
+
 static renderer_config_t *create_renderer_config()
 {
     renderer_config_t *renderer_config = calloc(1, sizeof(renderer_config_t));
@@ -452,6 +467,12 @@ static void start_web_radio()
     }
 
     radio_config->url = get_url(); // play_url(); /* PLAY_URL; */
+
+    xTaskCreate(&http_server, "http_server", 2048, NULL, 5, NULL);
+    if (gpio_get_level(GPIO_NUM_16) == 0) {
+      while (1) 
+        vTaskDelay(200/portTICK_RATE_MS);
+    }
 
     // start radio
     web_radio_init(radio_config);
@@ -598,12 +619,16 @@ void app_main()
     bt_speaker_start(create_renderer_config());
 #else
     start_wifi();
-    start_web_radio();
-#endif
     i2c_example_master_init();
     SSD1306_Init();
+    i2c_clear();
+
+    start_web_radio();
+
     i2c_test();
+#endif
     ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());
     // ESP_LOGI(TAG, "app_main stack: %d\n", uxTaskGetStackHighWaterMark(NULL));
-    xTaskCreate(&http_server, "http_server", 2048, NULL, 5, NULL);
+    while (1)
+      vTaskDelay(200/portTICK_RATE_MS);
 }
