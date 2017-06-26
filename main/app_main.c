@@ -202,15 +202,7 @@ void erase_nvurl(int n) {
 
 xSemaphoreHandle print_mux;
 
-void i2c_clear(void)
-{
-    SSD1306_Fill(SSD1306_COLOR_BLACK); // clear screen
-    SSD1306_GotoXY(40, 4);
-    SSD1306_Puts("ESP32", &Font_11x18, SSD1306_COLOR_WHITE);
-    SSD1306_UpdateScreen();
-}
-
-void i2c_test(void)
+void i2c_test(int mode)
 {
     char *url = get_url(); // play_url();
 
@@ -231,13 +223,16 @@ void i2c_test(void)
 #else ////////for webradio mode display////////////////
     SSD1306_Puts("PCM5102A webradio", &Font_7x10, SSD1306_COLOR_WHITE);
     SSD1306_GotoXY(2, 30);
-    
-    SSD1306_Puts(url, &Font_7x10, SSD1306_COLOR_WHITE);
-    if (strlen(url) > 18)  {
-      SSD1306_GotoXY(2, 39);
-      SSD1306_Puts(url + 18, &Font_7x10, SSD1306_COLOR_WHITE);
+    if (mode) {
+      SSD1306_Puts("web server is up.", &Font_7x10, SSD1306_COLOR_WHITE);
+    } else {
+      SSD1306_Puts(url, &Font_7x10, SSD1306_COLOR_WHITE);
+      if (strlen(url) > 18)  {
+	SSD1306_GotoXY(2, 39);
+	SSD1306_Puts(url + 18, &Font_7x10, SSD1306_COLOR_WHITE);
+      }
+      SSD1306_GotoXY(16, 53);
     }
-    SSD1306_GotoXY(16, 53);
 
     tcpip_adapter_ip_info_t ip_info;
     tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
@@ -621,11 +616,11 @@ void app_main()
     start_wifi();
     i2c_example_master_init();
     SSD1306_Init();
-    i2c_clear();
+    i2c_test(1);
 
     start_web_radio();
 
-    i2c_test();
+    i2c_test(0);
 #endif
     ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());
     // ESP_LOGI(TAG, "app_main stack: %d\n", uxTaskGetStackHighWaterMark(NULL));
