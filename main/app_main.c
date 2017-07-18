@@ -601,7 +601,7 @@ void app_main()
     i2c_test();
     ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());
     // ESP_LOGI(TAG, "app_main stack: %d\n", uxTaskGetStackHighWaterMark(NULL));
-#ifdef CONFIG_BT_SPEAKER_MODE // Y.H.Cha : Add this to run in Web radio mode only
+#ifndef CONFIG_BT_SPEAKER_MODE // Y.H.Cha : Add this to run in Web radio mode only
 xTaskCreate(&http_server, "http_server", 2048, NULL, 5, NULL);
 #endif
 }
