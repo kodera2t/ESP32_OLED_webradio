@@ -24,6 +24,8 @@
 /* function picks the first URL with .mp3 extension and replces the "original" URL.
    It is not failsave against bad-formatted records or records without mp3-Urls. */
 //Aug.16, 2017: m3u support by Frantz
+//modified the "http.c" module to detect the "m3u" extension, get the page and extract the URL for the mp3-stream. 
+//It works with some of "m3u" links.
 url_t *m3urequest(url_t *url, int sock)
 {
 	 char *request;
