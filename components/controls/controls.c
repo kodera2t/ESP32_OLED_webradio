@@ -71,7 +71,7 @@ void controls_init(TaskFunction_t gpio_handler_task, const uint16_t usStackDepth
 
 void controls_destroy()
 {
-    gpio_isr_handler_remove(GPIO_NUM_0);
+    gpio_isr_handler_remove(GPIO_NUM_16);
     vTaskDelete(gpio_task);
     vQueueDelete(gpio_evt_queue);
     // TODO: free gpio_handler_param_t params

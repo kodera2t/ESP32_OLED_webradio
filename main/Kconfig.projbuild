@@ -52,4 +52,10 @@ menuconfig BT_SPEAKER_MODE
        Web radio streaming will be unavailable.
    depends on CLASSIC_BT_ENABLED
 
+  config SSD1306_6432
+     help
+	only for Web radio mode
+     bool "use SSD1306_6432"
+
 endmenu
+
