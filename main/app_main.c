@@ -294,14 +294,7 @@ void i2c_test(int mode)
 #endif
     /* Update screen, send changes to LCD */
     SSD1306_UpdateScreen();
-<<<<<<< HEAD
 
-    l = 0;
-=======
-    
-
-    
->>>>>>> origin/master
 }
 
 /**
@@ -670,7 +663,7 @@ void app_main()
     i2c_test(0);
 #endif
     ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());
-<<<<<<< HEAD
+
     // ESP_LOGI(TAG, "app_main stack: %d\n", uxTaskGetStackHighWaterMark(NULL));
     while (1) {
       vTaskDelay(40/portTICK_RATE_MS);
@@ -678,10 +671,10 @@ void app_main()
       oled_scroll();
 #endif
     }
-=======
+
     
 #ifndef CONFIG_BT_SPEAKER_MODE // Y.H.Cha : Add this to run in Web radio mode only
 xTaskCreate(&http_server, "http_server", 2048, NULL, 5, NULL);
 #endif
->>>>>>> origin/master
+
 }
