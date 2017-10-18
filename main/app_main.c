@@ -236,12 +236,7 @@ void i2c_test(void)
     /* Update screen, send changes to LCD */
     SSD1306_UpdateScreen();
     
-/* for class-D amplifier system. Dim OLED to avoid noise from panel*/
-/* PLEASE comment out next three lines for ESP32-ADB system*/  
-    vTaskDelay(500);
-    SSD1306_Fill(SSD1306_COLOR_BLACK);
-    SSD1306_UpdateScreen();  
-/* The above part is for class-D webradio system*/
+
     
 }
 
