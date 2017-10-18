@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 -> [new version](https://github.com/n24bass/ESP32_MP3_Decoder/tree/OLED_WEB)
 
+=======
+>>>>>>> origin/master
 Modified for multi URL support by n24bass
 
 Add web interface. You can add (up to 10), change or remove URL of the internet radio station. 
