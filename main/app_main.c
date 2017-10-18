@@ -277,10 +277,10 @@ void i2c_test(int mode)
     if (mode) {
       SSD1306_Puts("web server is up.", &Font_7x10, SSD1306_COLOR_WHITE);
     } else {
-      SSD1306_Puts(url, &Font_7x10, SSD1306_COLOR_WHITE);
+      //SSD1306_Puts(url, &Font_7x10, SSD1306_COLOR_WHITE);
       if (strlen(url) > 18)  {
 	SSD1306_GotoXY(2, 39);
-	SSD1306_Puts(url + 18, &Font_7x10, SSD1306_COLOR_WHITE);
+	//SSD1306_Puts(url + 18, &Font_7x10, SSD1306_COLOR_WHITE);
       }
       SSD1306_GotoXY(16, 53);
     }
@@ -667,9 +667,9 @@ void app_main()
     // ESP_LOGI(TAG, "app_main stack: %d\n", uxTaskGetStackHighWaterMark(NULL));
     while (1) {
       vTaskDelay(40/portTICK_RATE_MS);
-#ifdef CONFIG_SSD1306_6432
+//#ifdef CONFIG_SSD1306_6432
       oled_scroll();
-#endif
+//#endif
     }
 
     
