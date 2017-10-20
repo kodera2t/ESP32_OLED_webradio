@@ -2,7 +2,7 @@
 Modified for multi URL support by n24bass
 (merged several new functions, URL scrolling!)
 
-##For the boards with ESP32-PICO-D4, please swap control switch from GPIO16 to GPIO0, since GPIO16 in PICO-D4 is used for internal SPI Flash ROM connection (pre-occupied). Swap can be done in components/controls/controls.c
+##For the boards with ESP32-PICO-D4, please swap control switch from GPIO16 to GPIO0, since GPIO16 in PICO-D4 is used for internal SPI Flash RAM connection (pre-occupied). Swap can be done in components/controls/controls.c
 
 Add web interface. You can add (up to 10), change or remove URL of the internet radio station. 
 
