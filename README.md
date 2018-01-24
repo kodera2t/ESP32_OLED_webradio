@@ -1,7 +1,6 @@
-###I cannot take any responsibility of the operation on the board,
-https://github.com/LilyGO/TTGO-TM-ESP32
-since I did not make it and also I don't know its circuit. Please do not ask me its support but directly ask "LiliGo" for your support.
-###
+
+##I cannot take any responsibility of the operation on the board, https://github.com/LilyGO/TTGO-TM-ESP32 since I did not make it and also I don't know its circuit. Please do not ask me its support but directly ask "LiliGo" for your support.
+
 
 
 Modified for multi URL support by n24bass
