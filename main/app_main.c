@@ -26,7 +26,7 @@
 #include "web_radio.h"
 #include "playerconfig.h"
 #include "app_main.h"
-#include "mdns_task.h"
+//#include "mdns_task.h"
 #ifdef CONFIG_BT_SPEAKER_MODE
 #include "bt_speaker.h"
 #endif
